@@ -34,7 +34,7 @@ Simply run:
 
 ```bash
 python Grad_CAM_main.py
-
+```
 
 If you use this code or find it helpful, please cite:
 @inproceedings{yu2025novel,
