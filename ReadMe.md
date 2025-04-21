@@ -37,9 +37,11 @@ python Grad_CAM_main.py
 ```
 
 If you use this code or find it helpful, please cite:
+```bash
 @inproceedings{yu2025novel,
   title={A Novel GNN Framework Integrating Neuroimaging and Behavioral Information to Understand Adolescent Psychiatric Disorders},
   author={Yu, Weifeng and Qu, Gang and Kim, Young-geun and Xu, Lei and Zhang, Aiying},
   booktitle={Medical Imaging with Deep Learning},
   year={2025}
 }
+```
