@@ -30,7 +30,7 @@ These steps will preprocess the data, train the model, and generate the final em
 
 ### 🧠 To check Grad-CAM results:
 
-Simply run:
+After you got save models in c1, c3 and correctly configured path, run:
 
 ```bash
 python Grad_CAM_main.py
