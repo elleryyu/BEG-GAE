@@ -110,7 +110,7 @@ class FC_Graph(DGLDataset):
 
 
 class Graph_with_adjacency_matrix(DGLDataset):
-    def __init__(self, adjacency_matrix,embedding_path=r"./graph_embeddings.pkl",label_path='./ABCD_site_11_6labels.csv'):
+    def __init__(self, adjacency_matrix,embedding_path=r"./graph_embeddings.pkl",label_path='./labels.csv'):
 
         self.embedding_path = embedding_path
         self.label_path = label_path
