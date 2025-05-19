@@ -41,5 +41,3 @@ final_df = pd.concat([fc_transformed_df, merged_df[label_cols]], axis=1)
 
 # Save as new csv
 final_df.to_csv('fc_and_labels_transformed.csv')
-
-print("Fisher Z transformed and saved into 'fc_and_labels_transformed.csv'")
