@@ -1,7 +1,7 @@
 """
 Author: Weifeng Yu (Ellery)
 Created:  '2024-09-01'
-Last Modified:2024-04-26
+Last Modified:2025-04-26
 Email: dag9wj@virginia.edu
 """
 
@@ -207,68 +207,6 @@ class Graph_with_adjacency_matrix(DGLDataset):
         return 1
 
 
-class ABCD_Subject2Subject(DGLDataset):
-    def __init__(self, data_csv_path=r"./site.csv",
-                 similarity_threshold=None, random_seed=42, dst_threshold=None):
-        super().__init__(name='HCDP')
-
-        self.data_csv_path = data_csv_path
-        self.similarity_threshold = similarity_threshold
-        self.dst_threshold = dst_threshold
-        self.random_seed = random_seed
-
-        # Read data and process
-        self.node_features, self.labels, self.node_indices, self.adjacency_matrix = self.process_data()
-
-    def process_data(self):
-        # Read data CSV
-        data_df = pd.read_csv(self.data_csv_path, index_col=0)
-        data_df = data_df.dropna()  # Remove rows with NaN values
-
-        # Define label columns
-        label_columns = ['Anx', 'OCD', 'ADHD', 'ODD', 'Cond']
-        feature_columns = [col for col in data_df.columns if col not in label_columns]
-
-        # Extract features and labels
-        node_features = data_df[feature_columns].values
-        labels = data_df[label_columns].values
-
-        # Create adjacency matrix using k-nearest neighbors
-        adjacency_matrix = kneighbors_graph(node_features, n_neighbors=25, mode='connectivity', include_self=False)
-        adjacency_matrix = adjacency_matrix.toarray()
-        adjacency_matrix = np.maximum(adjacency_matrix, adjacency_matrix.T)
-        np.fill_diagonal(adjacency_matrix, 0)
-
-        print(f"Adjacency matrix sparsity: {adjacency_matrix.sum() / adjacency_matrix.size:.4f}")
-
-        node_indices = data_df.index.tolist()
-
-        return node_features, labels, node_indices, adjacency_matrix
-
-    def __getitem__(self, idx):
-        if idx != 0:
-            raise IndexError("This dataset contains only one graph.")
-
-        x_tensor = torch.tensor(self.node_features, dtype=torch.float32)
-
-        # Create undirected edges
-        src, dst = np.nonzero(np.triu(self.adjacency_matrix, k=1))
-        edges = np.concatenate((np.vstack((src, dst)), np.vstack((dst, src))), axis=1)
-        src, dst = edges
-
-        src = torch.tensor(src, dtype=torch.long)
-        dst = torch.tensor(dst, dtype=torch.long)
-
-        g = dgl.graph((src, dst))
-        g.ndata['feature'] = x_tensor
-        g.ndata['label'] = torch.tensor(self.labels, dtype=torch.long)
-
-        return g
-
-    def __len__(self):
-        return 1
-
-
 class Graph_with_knn(DGLDataset):
     def __init__(self, embedding_path=r"./graph_embeddings.pkl", label_path='./ABCD_site_11_6labels.csv', k=25):
         self.embedding_path = embedding_path
@@ -307,7 +245,7 @@ class Graph_with_knn(DGLDataset):
         
         adjacency_matrix = kneighbors_graph(ordered_embeddings, self.k, mode='connectivity', include_self=False)
 
-        # 确保邻接矩阵是对称的
+        # Make sure adjacency matrix is symmetric
         adjacency_matrix = adjacency_matrix + adjacency_matrix.T 
         adjacency_matrix[adjacency_matrix > 1] = 1  
 
