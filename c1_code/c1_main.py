@@ -13,23 +13,15 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from data import FC_Graph
 
-# !Wrong
-# def embedding_generation(model, device, data_loader):
-#     model.eval()  # Set the model to evaluation mode
-#     all_embeddings={}
-#
-#
-#     with torch.no_grad():  # Disable gradient computation during evaluation
-#             sample_i = next(iter(data_loader))
-#             gs, subject_ids = sample_i
-#             gs = gs.to(device)
-#
-#             # Forward pass: Get the reconstructed output and embeddings
-#             _, embeddings = model(gs, gs.ndata['x'])
-#             for idx, subject_id in enumerate(subject_ids):
-#                 all_embeddings[subject_id] = embeddings[idx].cpu().numpy()
-#
-#     return all_embeddings
+# ==== Configuration ====
+GRAPH_PATH = './c1_graph_site_16/all_graphs_1.pkl'
+MODEL_PATH = 'saved_models_pth/gcn_model_1021_1.pth'
+OUTPUT_PATH = 'saved_pkl/graph_embeddings_site_16_1021.pkl'
+
+IN_FEATURES = 379
+HIDDEN_FEATURES = 128
+BATCH_SIZE = None  # Set to None to use len(dataset) dynamically
+
 
 def embedding_generation(model, device, data_loader):
     model.eval()  # Set the model to evaluation mode
@@ -60,33 +52,36 @@ def embedding_generation(model, device, data_loader):
 
         return all_graph_embeddings
 
-if __name__ == '__main__':
-    # Set the device (GPU/CPU)
+def main():
+    # Set the device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Load your Graph dataset
-    with open('./c1_graph_site_16/all_graphs_1.pkl', 'rb') as f:
-
+    # Load dataset
+    with open(GRAPH_PATH, 'rb') as f:
         dataset = pickle.load(f)
 
-    # Define DataLoader (assuming batch_size is large enough to load the entire dataset at once)
-    data_loader = DataLoader(dataset, batch_size=len(dataset), collate_fn=collate_func, shuffle=False)
+    # Define DataLoader
+    loader = DataLoader(
+        dataset,
+        batch_size=len(dataset) if BATCH_SIZE is None else BATCH_SIZE,
+        shuffle=False,
+        collate_fn=collate_func
+    )
 
-    # Initialize your model (with the correct input/output dimensions)
-    in_feats = 379  # Adjust to your dataset's input feature size
-    hidden_feats = 128  # Define the hidden dimension size
-    num_classes = in_feats  # For reconstruction, output the same number of features
+    # Initialize model
+    model = GCN(IN_FEATURES, HIDDEN_FEATURES, IN_FEATURES).to(device)
 
-    model = GCN(in_feats, hidden_feats, num_classes).to(device)
+    # Load pre-trained weights
+    model.load_state_dict(torch.load(MODEL_PATH))
 
-    # Load the pre-trained model weights (if needed)
-    model.load_state_dict(torch.load('saved_models_pth/gcn_model_1021_1.pth'))
+    # Generate embeddings
+    embeddings = embedding_generation(model, device, loader)
 
-    # Generate embeddings for the entire dataset
-    embeddings = embedding_generation(model, device, data_loader)
-
-    # Save the embeddings to a pickle file
-    with open('saved_pkl/graph_embeddings_site_16_1021.pkl', 'wb') as f:
+    # Save embeddings
+    with open(OUTPUT_PATH, 'wb') as f:
         pickle.dump(embeddings, f)
 
-    print("Embeddings have been saved to 'graph_embeddings_site_16_1021.pkl'.")
+    print(f"Embeddings saved to: {OUTPUT_PATH}")
+
+if __name__ == '__main__':
+    main()

@@ -19,6 +19,18 @@ from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from data import FC_Graph
 
+# ==== Configuration ====
+GRAPH_PATH = './c1_graph_site_16/all_graphs_1.pkl'
+MODEL_PATH = 'saved_models_pth/gcn_model_1021_1.pth'
+BATCH_SIZE = 16
+IN_FEATURES = 379
+HIDDEN_FEATURES = 128
+LEARNING_RATE = 1e-4
+NUM_EPOCHS = 80
+TRAIN_RATIO = 0.7
+VAL_RATIO = 0.2
+SEED = 42
+
 
 
 def train_epoch(model, optimizer, device, data_loader, epoch):
@@ -69,63 +81,57 @@ def evaluate_network(model, device, data_loader, epoch):
     return epoch_loss, embeddings
 
 
-if __name__ == '__main__':
-    set_random_seed()
+# ==== Main Script ====
+def main():
+    set_random_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    train_ratio=0.7
-    val_ratio=0.2
 
-    with open('./c1_graph_site_16/all_graphs_1.pkl', 'rb') as f:
+    # Load dataset
+    with open(GRAPH_PATH, 'rb') as f:
         dataset = pickle.load(f)
 
+    # Split dataset
+    total_size = len(dataset)
+    train_size = int(TRAIN_RATIO * total_size)
+    val_size = int(VAL_RATIO * total_size)
+    test_size = total_size - train_size - val_size
 
-    train_size=int(train_ratio*len(dataset))
-    val_size=int(val_ratio*len(dataset))
-    test_size= len(dataset)-train_size-val_size
+    train_set, val_set, test_set = random_split(dataset, [train_size, val_size, test_size])
 
-    train_set, val_set, test_set=torch.utils.data.random_split(dataset,[train_size,val_size,test_size])
+    # Define DataLoaders
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, collate_fn=collate_func)
+    val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, collate_fn=collate_func)
+    test_loader = DataLoader(test_set, batch_size=test_size, shuffle=False, collate_fn=collate_func)
 
-    train_loader= DataLoader(train_set,shuffle=True,batch_size=16,collate_fn=collate_func)
-    val_loader= DataLoader(val_set,batch_size=4,collate_fn=collate_func)
-    test_loader=DataLoader(test_set,batch_size=4,collate_fn=collate_func)
+    # Initialize model
+    model = GCN(IN_FEATURES, HIDDEN_FEATURES, IN_FEATURES).to(device)
 
-    in_feats = 379  # Input feature size (based on your graph size)
-    hidden_feats = 128  # Hidden layer size (can be tuned)
-    num_classes = in_feats  # For reconstruction, output the same number of features
-
-    model = GCN(in_feats, hidden_feats, num_classes).to(device)
-
-    model_path='saved_models_pth/gcn_model_1021_1.pth'
-
-    if os.path.exists(model_path):
+    # Load pre-trained weights if available
+    if os.path.exists(MODEL_PATH):
         try:
-            model.load_state_dict(torch.load(model_path))
-            print(f"Loaded pre-trained model weights from {model_path}.")
+            model.load_state_dict(torch.load(MODEL_PATH))
+            print(f"Loaded pre-trained model from: {MODEL_PATH}")
         except Exception as e:
-            print(f"Error loading model weights: {e}")
+            print(f"Failed to load pre-trained model. Error: {e}")
     else:
-        print(f"No pre-trained model found at {model_path}. Starting from scratch.")
+        print(f"No pre-trained model found at {MODEL_PATH}. Training from scratch.")
 
-
-    # Set up the optimizer
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-
-    # Set number of epochs
-    num_epochs = 80
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
     # Training loop
-    for epoch in range(1, num_epochs + 1):
-        print(f"Epoch {epoch}/{num_epochs}")
-
-        # Train for one epoch
+    for epoch in range(1, NUM_EPOCHS + 1):
+        print(f"\n=== Epoch {epoch}/{NUM_EPOCHS} ===")
         train_loss, optimizer = train_epoch(model, optimizer, device, train_loader, epoch)
+        val_loss, _ = evaluate_network(model, device, val_loader, epoch)
+        print(f"Train Loss: {train_loss:.4f} | Validation Loss: {val_loss:.4f}")
 
-        # Evaluate on the validation set
-        val_loss, val_embeddings = evaluate_network(model, device, val_loader, epoch)
-        print(f"Training Loss: {train_loss:.4f}, Validation Loss: {val_loss:.4f}")
+    # Final evaluation on test set
+    test_loss, test_embeddings = evaluate_network(model, device, test_loader, epoch=NUM_EPOCHS + 1)
+    print(f"\nFinal Test Loss: {test_loss:.4f}")
 
-    test_loss, test_embeddings = evaluate_network(model, device, test_loader, epoch=1)
-    print(f"Testing Loss: {test_loss:.4f}")
-    # Save the final trained model
-    torch.save(model.state_dict(), 'saved_models_pth/gcn_model_1021_1.pth')
-    print("Model saved to './gcn_model_1021_1.pth'.")
+    # Save the trained model
+    torch.save(model.state_dict(), MODEL_PATH)
+    print(f"Trained model saved to: {MODEL_PATH}")
+
+if __name__ == "__main__":
+    main()

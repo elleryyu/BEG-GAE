@@ -1,3 +1,10 @@
+"""
+Author: Gang Qu
+Created:  '2024-09-01'
+Last Modified:2025-04-26
+Email:  adamrt9319@gmail.com
+"""
+
 import pandas as pd
 import torch
 from torch.optim import Adam

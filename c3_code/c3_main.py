@@ -18,88 +18,94 @@ Description: This file is mainly for training population graph.
 
 output: GAE_pop.model.pth
 """
+# ==== Configuration ====
+GRAPH_PATH = 'saved_pkl/g_c3_site_16_1021_1.pkl'
+MODEL_PATH = 'saved_models_pth/gcn_model_single_graph_site_16_1028_0.pth'
+IN_FEATS = None  # Will be inferred from graph
+HIDDEN_FEATS = 64
+LEARNING_RATE = 1e-4
+NUM_EPOCHS = 10000
+PATIENCE = 3000
+MIN_DELTA = 1e-4
+SEED = 42
 
-def train_epoch(model, optimizer, device, graph, epoch):
+
+# ==== Training Function ====
+def train_epoch(model, optimizer, device, graph):
     model.train()
-    model = model.to(device)
-
-
+    model.to(device)
     graph = graph.to(device)
 
     optimizer.zero_grad()
-
-    reconstructed, embeddings = model(graph, graph.ndata['x'])
-
+    reconstructed, _ = model(graph, graph.ndata['x'])
     loss = F.mse_loss(reconstructed, graph.ndata['x'])
     loss.backward()
     optimizer.step()
-    epoch_loss = loss.detach().item()
 
-    return epoch_loss, optimizer
+    return loss.item()
 
-if __name__ == '__main__':
-    set_random_seed()
+
+# ==== Main Execution ====
+def main():
+    # Set random seed and device
+    set_random_seed(SEED)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    with open('saved_pkl/g_c3_site_16_1021_1.pkl', 'rb') as f:
+    # Load graph and node IDs
+    with open(GRAPH_PATH, 'rb') as f:
         dataset = pickle.load(f)
         node_ids = pickle.load(f)
 
-    print('node_ids:', node_ids)
+    print(f"Loaded node IDs: {node_ids[:10]}...")
 
-    if isinstance(dataset, list):
-        graph = dataset[0]
-    else:
-        graph = dataset
+    graph = dataset[0] if isinstance(dataset, list) else dataset
 
+    # Define model dimensions
     in_feats = graph.ndata['x'].shape[1]
-    hidden_feats = 64
-    num_classes = in_feats
+    model = GCN(in_feats=in_feats, hidden_feats=HIDDEN_FEATS, num_classes=in_feats).to(device)
 
-    model = GCN(in_feats=in_feats, hidden_feats=hidden_feats, num_classes=num_classes).to(device)
-    model_path = 'saved_models_pth/gcn_model_single_graph_site_16_1028_0.pth'
-
-    if os.path.exists(model_path):
+    # Load pre-trained weights if available
+    if os.path.exists(MODEL_PATH):
         try:
-            model.load_state_dict(torch.load(model_path))
-            print(f"Loaded pre-trained model weights from {model_path}.")
+            model.load_state_dict(torch.load(MODEL_PATH))
+            print(f"Loaded pre-trained model from: {MODEL_PATH}")
         except Exception as e:
             print(f"Error loading model weights: {e}")
     else:
-        print(f"No pre-trained model found at {model_path}. Starting from scratch.")
+        print(f"No pre-trained model found at {MODEL_PATH}. Starting from scratch.")
 
-    optimizer = optim.Adam(model.parameters(), lr=0.0001)
-    num_epochs = 10000
+    # Set up optimizer
+    optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
 
-    # Early stopping parameters
-    patience = 3000  # Number of epochs with no improvement after which training stops
-    min_delta = 0.0001  # Minimum change to qualify as an improvement
+    # Early stopping setup
     best_loss = float('inf')
-    counter = 0
+    epochs_without_improvement = 0
 
-    for epoch in range(1, num_epochs + 1):
+    # Training loop
+    for epoch in range(1, NUM_EPOCHS + 1):
+        train_loss = train_epoch(model, optimizer, device, graph)
 
+        # Log every 100 epochs
+        if epoch % 100 == 0:
+            print(f"Epoch {epoch}/{NUM_EPOCHS} - Training Loss: {train_loss:.6f}")
 
-        train_loss, optimizer = train_epoch(model, optimizer, device, graph, epoch)
-        if epoch%100==0:
-            print(f"Epoch {epoch}/{num_epochs}")
-            print(f"Training Loss: {train_loss:.4f}")
-
-        # Early stopping logic
-        if train_loss + min_delta < best_loss:
+        # Check for improvement
+        if train_loss + MIN_DELTA < best_loss:
             best_loss = train_loss
-            counter = 0
-            # Save the best model
-            torch.save(model.state_dict(), model_path)
-            # print(f"Training loss improved. Model saved to '{model_path}'.")
+            epochs_without_improvement = 0
+            torch.save(model.state_dict(), MODEL_PATH)
         else:
-            counter += 1
+            epochs_without_improvement += 1
 
-
-        if counter >= patience:
-            print(f"Early stopping triggered after {patience} epochs without improvement.")
+        # Trigger early stopping
+        if epochs_without_improvement >= PATIENCE:
+            print(f"Early stopping triggered after {PATIENCE} epochs without improvement.")
             break
 
-    # After early stopping or full training, ensure the final model is saved
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to '{model_path}' after training.")
+    # Final model save
+    torch.save(model.state_dict(), MODEL_PATH)
+    print(f"Final model saved to: {MODEL_PATH}")
+
+
+if __name__ == '__main__':
+    main()

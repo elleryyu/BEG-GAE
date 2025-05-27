@@ -288,20 +288,23 @@ class Graph_with_knn(DGLDataset):
 if __name__ == "__main__":
 
     save_path='c1_graph_site_16'
+    train_ratio = 0.7
+    val_ratio = 0.1
+    random_seed = 42
+
+    
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
     # similarity_threshold = 0.995
-    train_ratio = 0.7
-    val_ratio = 0.1
-    random_seed = 2
+
     dataset = FC_Graph(dataset_path='./site_16/site_16_FC',
                        train_ratio=train_ratio, val_ratio=val_ratio, random_seed=random_seed)
     sub_ids= dataset.subject_ids
     graphs=dataset.graphs
 
     print(len(dataset))
-    with open(f'{save_path1}/all_graphs_1.pkl', 'wb') as f:
+    with open(f'{save_path}/all_graphs_1.pkl', 'wb') as f:
         pickle.dump(dataset, f)
     print("All graphs have been saved to './c1_graph_site_16/all_graphs_1.pkl'.")
 
